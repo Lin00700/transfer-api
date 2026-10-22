@@ -15,7 +15,6 @@ compatibility_date = "2025-11-21"
 # or x-api-key: <key>; the Worker forwards it upstream when no secret is set.
 
 [vars]
-# Disabled for safety. Set a trusted, compatible HTTPS upstream explicitly.
-# The previously configured upstream and its subdomains are blocked in code.
+UPSTREAM_BASE_URL = "https://unlimited.surf"
 DEFAULT_MODEL = "gateway-gpt-5"
 DEFAULT_CLAUDE_MODEL = "claude-opus-4-7-20260101"

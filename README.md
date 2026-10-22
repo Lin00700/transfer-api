@@ -1,9 +1,5 @@
 # Transfer unlimited.surf API Worker
 
-> **安全停用 / Upstream disabled:** 已移除默认上游和部署配置中的 `unlimited.surf`，代码会拒绝该域名及其子域名。未配置可信、接口兼容的 HTTPS 上游时，服务返回 `503 upstream_disabled`，不发起上游请求。以下旧教程仅保留作历史参考，不应再用于连接该站点或有本地工具权限的 agent。风险依据是[社区反馈](https://github.com/eooce/transfer-api/issues/1)，并非已完成的独立恶意代码鉴定。已有线上 Worker 需要重新部署本修改才会生效；建议撤销旧上游密钥。
->
-> The default upstream has been removed. The reported domain and its subdomains are blocked. Without an explicitly configured trusted, API-compatible HTTPS upstream, requests fail closed with HTTP 503. The legacy instructions below are historical only. Existing deployments require redeployment; revoke old upstream credentials.
-
 中文 | [English](#english)
 
 这是一个 Cloudflare Worker 中转适配器，用于把 `https://unlimited.surf` 转换成 OpenAI 兼容的 `/v1/*` 接口，以及 Anthropic/Claude Code 兼容的 `/v1/messages` 和 `/anthropic/*` 接口。
