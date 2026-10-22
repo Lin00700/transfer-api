@@ -1,4 +1,3 @@
-const DEFAULT_UPSTREAM_BASE_URL = "https://unlimited.surf";
 const DEFAULT_OPENAI_MODEL = "gateway-gpt-5-5";
 const DEFAULT_CLAUDE_MODEL = "claude-opus-4-7-20260101";
 
@@ -21,6 +20,13 @@ export default {
     try {
       const authError = validateWorkerApiKey(request, env);
       if (authError) return authError;
+
+      // Fail closed before any route, including model-list fallbacks and setup.
+      try {
+        upstreamBase(env);
+      } catch (error) {
+        return errorResponse(503, "upstream_disabled", error.message);
+      }
 
       if (path === "/" || path === "/health") {
         return jsonResponse(serviceInfo(request, env));
@@ -462,6 +468,7 @@ async function callUnlimitedJson(request, env, path, payload) {
     method: "POST",
     headers: upstreamHeaders(request, env, false),
     body: JSON.stringify(payload || {}),
+    redirect: "error",
   });
 
   if (!response.ok) {
@@ -476,6 +483,7 @@ async function callUnlimitedStream(request, env, path, payload) {
     method: "POST",
     headers: upstreamHeaders(request, env, true),
     body: JSON.stringify(payload || {}),
+    redirect: "error",
   });
 
   if (!response.ok) {
@@ -506,7 +514,7 @@ async function getModelCatalog(request, env) {
     const headers = new Headers();
     const key = optionalUpstreamApiKey(request, env);
     if (key) headers.set("Authorization", `Bearer ${key}`);
-    const response = await fetch(new URL("/api/models", upstreamBase(env)), { headers });
+    const response = await fetch(new URL("/api/models", upstreamBase(env)), { headers, redirect: "error" });
     if (!response.ok) throw new Error(`models failed: ${response.status}`);
     const data = await response.json();
     const models = Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : [];
@@ -874,7 +882,19 @@ function constantTimeEqual(actual, expected) {
 }
 
 function upstreamBase(env) {
-  return stripTrailingSlash(env.UPSTREAM_BASE_URL || DEFAULT_UPSTREAM_BASE_URL) + "/";
+  const configured = String(env.UPSTREAM_BASE_URL || "").trim();
+  if (!configured) {
+    throw new Error("Upstream disabled for safety. Configure a trusted, compatible HTTPS UPSTREAM_BASE_URL before use.");
+  }
+  const url = new URL(configured);
+  const hostname = url.hostname.toLowerCase().replace(/\.+$/, "");
+  if (hostname === "unlimited.surf" || hostname.endsWith(".unlimited.surf")) {
+    throw new Error("This upstream is blocked due to reported prompt-injection risk.");
+  }
+  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
+    throw new Error("UPSTREAM_BASE_URL must be an HTTPS URL without credentials, query or fragment.");
+  }
+  return stripTrailingSlash(url.href) + "/";
 }
 
 function normalizePath(path) {
@@ -1077,7 +1097,7 @@ function serviceInfo(request, env) {
   return {
     ok: true,
     service: "unlimited.surf OpenAI/Anthropic compatibility Worker",
-    upstream: stripTrailingSlash(env.UPSTREAM_BASE_URL || DEFAULT_UPSTREAM_BASE_URL),
+    upstream: stripTrailingSlash(upstreamBase(env)),
     routes: {
       raw: `${origin}/api/chat, /api/search, /api/merge, /api/models, /api/key, /api/attachments/extract`,
       openai: `${origin}/v1/chat/completions, /v1/responses, /v1/models, /v1/files`,
